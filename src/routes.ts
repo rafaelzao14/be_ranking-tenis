@@ -1,8 +1,10 @@
 import { Router } from "express";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "./prismaClient";
 
 export const router = Router();
+type RankedPlayer = { id: string; currentRank: number | null };
 
 router.get("/", (_req, res) => {
   res.json({ ok: true, name: "ranking-tenis-backend" });
@@ -447,7 +449,7 @@ router.post("/matches", async (req, res) => {
   }
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const [p1, p2] = await Promise.all([
         tx.player.findUnique({ where: { id: dto.player1Id } }),
         tx.player.findUnique({ where: { id: dto.player2Id } }),
@@ -502,7 +504,7 @@ router.post("/matches", async (req, res) => {
             select: { id: true, currentRank: true },
           });
 
-          const beforeMap = new Map(affectedBefore.map((x) => [x.id, x.currentRank]));
+          const beforeMap = new Map(affectedBefore.map((x: RankedPlayer) => [x.id, x.currentRank]));
 
           // tira desafiante temporariamente
           await tx.player.update({
@@ -533,13 +535,13 @@ router.post("/matches", async (req, res) => {
           });
 
           const affectedAfter = await tx.player.findMany({
-            where: { id: { in: affectedBefore.map((x) => x.id) } },
+            where: { id: { in: affectedBefore.map((x: RankedPlayer) => x.id) } },
             select: { id: true, currentRank: true },
           });
-          const afterMap = new Map(affectedAfter.map((x) => [x.id, x.currentRank]));
+          const afterMap = new Map(affectedAfter.map((x: RankedPlayer) => [x.id, x.currentRank]));
 
           await tx.rankHistory.createMany({
-            data: affectedBefore.map((b) => ({
+            data: affectedBefore.map((b: RankedPlayer) => ({
               matchId: match.id,
               playerId: b.id,
               rankBefore: beforeMap.get(b.id) ?? b.currentRank ?? 0,
@@ -566,7 +568,7 @@ router.post("/matches", async (req, res) => {
             orderBy: { currentRank: "asc" },
           });
 
-          const beforeMap = new Map(affectedBefore.map((x) => [x.id, x.currentRank]));
+          const beforeMap = new Map(affectedBefore.map((x: RankedPlayer) => [x.id, x.currentRank]));
 
           const agg = await tx.player.aggregate({ _max: { currentRank: true } });
           const maxRank = agg._max.currentRank ?? 0;
@@ -590,17 +592,17 @@ router.post("/matches", async (req, res) => {
             data: { currentRank: ra },
           });
 
-          const affectedIds = [...affectedBefore.map((x) => x.id), dto.player1Id];
+          const affectedIds = [...affectedBefore.map((x: RankedPlayer) => x.id), dto.player1Id];
 
           const affectedAfter = await tx.player.findMany({
             where: { id: { in: affectedIds } },
             select: { id: true, currentRank: true },
           });
-          const afterMap = new Map(affectedAfter.map((x) => [x.id, x.currentRank]));
+          const afterMap = new Map(affectedAfter.map((x: RankedPlayer) => [x.id, x.currentRank]));
 
           // history dos jogadores afetados
           await tx.rankHistory.createMany({
-            data: affectedBefore.map((b) => ({
+            data: affectedBefore.map((b: RankedPlayer) => ({
               matchId: match.id,
               playerId: b.id,
               rankBefore: beforeMap.get(b.id) ?? b.currentRank ?? 0,
