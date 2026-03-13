@@ -23,6 +23,9 @@ import { RankHistory } from './entities/rank-history.entity';
       synchronize: false,
       logging: false,
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      extra: {
+        family: 4,
+      },
     }),
   ],
   exports: [TypeOrmModule],
