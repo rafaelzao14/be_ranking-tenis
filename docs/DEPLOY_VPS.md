@@ -1,83 +1,124 @@
 # Deploy automatico na VPS (Docker)
 
-Este projeto agora esta configurado para fazer deploy automatico na VPS quando houver `push` na branch `main`.
+Este projeto foi migrado para NestJS e esta configurado para deploy automatico na VPS ao fazer `push` na branch `main`.
 
-## Como funciona
+## Resumo do fluxo
 
-1. O workflow `Docker Publish` publica a imagem no GHCR com a tag `main`.
-2. Ao concluir com sucesso, o workflow `Deploy VPS` conecta na VPS por SSH.
-3. Na VPS, ele atualiza o repositorio, faz `docker compose pull` da API e sobe com `docker compose up -d`.
+1. `Docker Publish` gera/publica a imagem no GHCR com a tag `main`.
+2. `Deploy VPS` roda automaticamente quando o publish da `main` termina com sucesso.
+3. O deploy conecta via SSH na VPS, atualiza o repositorio e executa:
+   - `docker compose -f docker-compose.vps.yml pull api`
+   - `docker compose -f docker-compose.vps.yml up -d --remove-orphans`
 
-## Arquivos adicionados
+## Arquivos de deploy
 
 - `.github/workflows/deploy-vps.yml`
 - `docker-compose.vps.yml`
 - `scripts/deploy-vps.sh`
 
-## Passo a passo de configuracao
+## Pré-requisitos da VPS
 
-### 1) Preparar a VPS (primeira vez)
+- Docker e Docker Compose plugin instalados.
+- Repositorio clonado em `/opt/ranking-tenis/be_ranking-tenis`.
+- Banco Postgres rodando em container (no mesmo host).
+- Rede Docker compartilhada `savaris_backend` para API e banco.
 
-Instale Docker + Docker Compose plugin na VPS e garanta que o usuario do deploy consegue rodar `docker`.
+## Passo a passo completo
 
-Depois:
+### 1) Clonar repositorio na VPS
 
 ```bash
 sudo mkdir -p /opt/ranking-tenis
 sudo chown -R $USER:$USER /opt/ranking-tenis
 cd /opt/ranking-tenis
-git clone <URL_DO_REPO> .
-cp .env.example .env
+git clone <URL_DO_REPO> be_ranking-tenis
+cd be_ranking-tenis
 ```
 
-Edite o `.env` com valores de producao, principalmente `DATABASE_URL`, `JWT_SECRET` e `JWT_REFRESH_SECRET`.
-
-### 2) Subir a API manualmente uma vez (opcional para validar)
+### 2) Configurar variaveis de ambiente
 
 ```bash
-cd /opt/ranking-tenis
-IMAGE=ghcr.io/<owner>/<repo>:main docker compose -f docker-compose.vps.yml up -d
+cp .env.example .env
+nano .env
 ```
 
-### 3) Configurar secrets no GitHub
+Campos obrigatorios para producao:
 
-No repositorio, configure em `Settings > Secrets and variables > Actions`:
+- `NODE_ENV=production`
+- `DATABASE_URL` apontando para o banco correto
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+- `AUTH_USER`
+- `AUTH_PASSWORD`
 
-- `VPS_HOST`: IP ou dominio da VPS
-- `VPS_USER`: usuario SSH
-- `VPS_SSH_KEY`: chave privada SSH usada pelo GitHub Actions
+Exemplo com banco em container local chamado `postgres`:
 
-### 4) Garantir permissao do pacote no GHCR
+```env
+DATABASE_URL="postgresql://postgres:postgres@postgres:5432/rank_tenis_hom?schema=public"
+```
 
-Se a imagem estiver privada, faca login no GHCR uma vez na VPS:
+### 3) Garantir rede entre API e banco
+
+```bash
+docker network create savaris_backend || true
+docker network connect savaris_backend postgres || true
+```
+
+Observacao:
+- O `docker-compose.vps.yml` ja conecta a API na rede `savaris_backend`.
+- Se o banco estiver em outro container/nome, troque `postgres` no comando acima e na `DATABASE_URL`.
+
+### 4) Login no GHCR (uma vez)
+
+Necessario se o pacote for privado:
 
 ```bash
 docker login ghcr.io -u <github-user>
 ```
 
-Use um token com escopo `read:packages`. O Docker guardara as credenciais para os proximos deploys.
+Use token com escopo `read:packages`.
 
-### 5) Testar deploy automatico
+### 5) Configurar secrets do GitHub Actions
 
-Faça um commit na `main` e `push`.
+Em `Settings > Secrets and variables > Actions`, criar:
 
-Fluxo esperado:
+- `VPS_HOST` (ex: `62.171.173.97`)
+- `VPS_USER` (ex: `root`)
+- `VPS_SSH_KEY` (chave privada da automacao)
 
-1. `Docker Publish` termina com sucesso.
-2. `Deploy VPS` executa automaticamente.
-3. API atualizada na VPS.
-
-## Comandos uteis na VPS
+### 6) Validar deploy manual (opcional)
 
 ```bash
-cd /opt/ranking-tenis
-docker compose -f docker-compose.vps.yml ps
-docker compose -f docker-compose.vps.yml logs -f api
+cd /opt/ranking-tenis/be_ranking-tenis
+IMAGE=ghcr.io/<owner>/<repo>:main docker compose -f docker-compose.vps.yml up -d
 ```
 
-## Deploy manual pela VPS (fallback)
+### 7) Deploy automatico via push
 
 ```bash
-cd /opt/ranking-tenis
+git add .
+git commit -m "chore: migrate to nestjs and vps deploy"
+git push origin main
+```
+
+## Validacao pos-deploy
+
+```bash
+cd /opt/ranking-tenis/be_ranking-tenis
+export IMAGE=ghcr.io/<owner>/<repo>:main
+
+docker compose -f docker-compose.vps.yml ps
+docker compose -f docker-compose.vps.yml logs --tail=100 api
+curl -i http://localhost:3333/
+```
+
+Swagger:
+
+- `http://<VPS_HOST>:3333/docs`
+
+## Deploy manual de fallback
+
+```bash
+cd /opt/ranking-tenis/be_ranking-tenis
 IMAGE=ghcr.io/<owner>/<repo>:main ./scripts/deploy-vps.sh
 ```

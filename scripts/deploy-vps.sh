@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-APP_DIR="${APP_DIR:-/opt/ranking-tenis}"
+APP_DIR="${APP_DIR:-/opt/ranking-tenis/be_ranking-tenis}"
 IMAGE="${IMAGE:?IMAGE is required}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 
