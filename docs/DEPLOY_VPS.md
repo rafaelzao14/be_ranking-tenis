@@ -90,6 +90,8 @@ Criar:
 - `VPS_HOST`
 - `VPS_USER`
 - `VPS_SSH_KEY`
+- `GHCR_USER` (usuario GitHub com acesso de leitura ao pacote)
+- `GHCR_TOKEN` (token com escopo `read:packages`)
 
 ## 6) Teste manual inicial na VPS
 

@@ -20,12 +20,14 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ghcr.io/${{ github.repository }}:main
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          envs: IMAGE
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN
           script: |
             set -eu
             APP_DIR="/opt/ranking-tenis/be_ranking-tenis"
@@ -40,6 +42,10 @@ jobs:
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
+
+            if [ -n "${GHCR_USER:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            fi
 
             IMAGE="$IMAGE" docker compose -f docker-compose.vps.yml pull api
             IMAGE="$IMAGE" docker compose -f docker-compose.vps.yml up -d --remove-orphans
