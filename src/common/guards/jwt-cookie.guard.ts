@@ -12,6 +12,13 @@ export class JwtCookieGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<Request & { user?: unknown }>();
+
+    // Swagger docs must stay public for API inspection.
+    if (req.path.startsWith('/docs') || req.path === '/docs-json') {
+      return true;
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -21,7 +28,6 @@ export class JwtCookieGuard implements CanActivate {
       return true;
     }
 
-    const req = context.switchToHttp().getRequest<Request & { user?: unknown }>();
     const cookieToken = req.cookies?.access_token as string | undefined;
     const bearer = req.headers.authorization?.startsWith('Bearer ')
       ? req.headers.authorization.slice(7)
