@@ -14,6 +14,11 @@ export class JwtCookieGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request & { user?: unknown }>();
 
+    // CORS preflight must bypass auth guard.
+    if (req.method === 'OPTIONS') {
+      return true;
+    }
+
     // Swagger docs must stay public for API inspection.
     if (req.path.startsWith('/docs') || req.path === '/docs-json') {
       return true;
