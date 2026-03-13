@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { Challenge } from './database/entities/challenge.entity';
 import { Match } from './database/entities/match.entity';
@@ -20,7 +21,7 @@ export default new DataSource({
         database: process.env.DB_NAME,
       }),
   entities: [Player, Challenge, Match, RankHistory, User],
-  migrations: ['src/migrations/*.ts'],
+  migrations: [join(__dirname, 'migrations/*{.ts,.js}')],
   synchronize: false,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   extra: {
